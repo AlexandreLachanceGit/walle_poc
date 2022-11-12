@@ -5,3 +5,4 @@ build:
 
 deploy:
 	terraform apply "tfplan.out"
+	cd register_test && node index.js

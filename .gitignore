@@ -1,6 +1,7 @@
 /target
 bootstrap
 *.zip
+.env
 
 # Local .terraform directories
 **/.terraform/*
