@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ path: "../.env" });
 const axios = require("axios");
 
 let url = `https://discord.com/api/v8/applications/${process.env.APP_ID}/commands`;
