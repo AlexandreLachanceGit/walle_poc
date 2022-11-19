@@ -4,5 +4,5 @@ build:
 	cd terraform && terraform plan -out tfplan.out
 
 deploy:
-	terraform apply "tfplan.out"
+	cd terraform && terraform apply "tfplan.out"
 	cd register_test && node index.js
