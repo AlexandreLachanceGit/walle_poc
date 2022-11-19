@@ -15,7 +15,7 @@ pub fn validate_discord_signature(headers: &HeaderMap, body: &Body) -> anyhow::R
     let sig_ed25519 = {
         let header_signature = headers
             .get("X-Signature-Ed25519")
-            .ok_or(anyhow::anyhow!("missing X-Signature-Ed25519 header"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing X-Signature-Ed25519 header"))?;
         let decoded_header = hex::decode(header_signature)?;
 
         let mut sig_arr: [u8; 64] = [0; 64];
@@ -27,7 +27,7 @@ pub fn validate_discord_signature(headers: &HeaderMap, body: &Body) -> anyhow::R
     .unwrap();
     let sig_timestamp = headers
         .get("X-Signature-Timestamp")
-        .ok_or(anyhow::anyhow!("missing X-Signature-Timestamp header"))?;
+        .ok_or_else(|| anyhow::anyhow!("Missing X-Signature-Timestamp header"))?;
 
     if let Body::Text(body) = body {
         let content = sig_timestamp
@@ -38,7 +38,7 @@ pub fn validate_discord_signature(headers: &HeaderMap, body: &Body) -> anyhow::R
             .collect::<Vec<u8>>();
 
         pub_key
-            .verify(&content.as_slice(), &sig_ed25519)
+            .verify(content.as_slice(), &sig_ed25519)
             .map_err(anyhow::Error::msg)
     } else {
         Err(anyhow::anyhow!("Invalid body type"))

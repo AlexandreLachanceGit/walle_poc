@@ -1,0 +1,14 @@
+{
+  "commands": [
+    {
+      "name": "ping",
+      "type": 1,
+      "description": "pong"
+    },
+    {
+      "name": "test",
+      "type": 1,
+      "description": "test"
+    }
+  ]
+}
