@@ -36,7 +36,7 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
 
     let data = req
         .payload::<InteractionObject>()
-        .unwrap_or_else(|_parse_err| None)
+        .unwrap_or(None)
         .unwrap_or_default();
     println!("{:?}", data);
 
