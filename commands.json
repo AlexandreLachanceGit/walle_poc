@@ -4,6 +4,11 @@
             "name": "ping",
             "type": 1,
             "description": "pong"
+        },
+        {
+            "name": "pong",
+            "type": 1,
+            "description": "ping"
         }
     ]
 }

@@ -1,7 +1,11 @@
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::str::FromStr;
 use validator::validate_discord_signature;
+
+mod commands;
+use commands::Command;
 
 mod validator;
 
@@ -55,7 +59,9 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                 .map_err(Box::new)?
         }
         2 => {
-            println!("Responding to {}!", data.data.unwrap().name);
+            let command = Command::from_str(&data.data.unwrap().name).unwrap();
+            println!("Responding to {:?}!", command);
+
             Response::builder()
                 .status(200)
                 .header("Content-Type", "application/json")
@@ -64,7 +70,7 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                         "type": 4,
                         "data": {
                             "tts": true,
-                            "content": "Pong!",
+                            "content": command.run(),
                             "embeds": [],
                             "allowed_mentions": { "parse": [] }
                         }
