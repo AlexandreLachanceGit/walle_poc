@@ -63,8 +63,8 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                     json!({
                         "type": 4,
                         "data": {
-                            "tts": false,
-                            "content": "Pong from AWS Lambda ;)",
+                            "tts": true,
+                            "content": "Pong!",
                             "embeds": [],
                             "allowed_mentions": { "parse": [] }
                         }
