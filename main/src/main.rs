@@ -1,30 +1,14 @@
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::str::FromStr;
 use validator::validate_discord_signature;
 
 mod commands;
 use commands::Command;
 
+mod discord;
+use discord::InteractionObject;
+
 mod validator;
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-struct InteractionObject {
-    id: String,
-    application_id: String,
-    #[serde(rename = "type")]
-    interaction_type: i32,
-    data: Option<InteractionData>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-struct InteractionData {
-    id: String,
-    #[serde(rename = "type")]
-    command_type: i32,
-    name: String,
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -59,8 +43,11 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                 .map_err(Box::new)?
         }
         2 => {
-            let command = Command::from_str(&data.data.unwrap().name).unwrap();
+            let data = data.data.unwrap();
+            let command = Command::new(data).unwrap();
             println!("Responding to {:?}!", command);
+
+            let content = command.run().await;
 
             Response::builder()
                 .status(200)
@@ -69,8 +56,8 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                     json!({
                         "type": 4,
                         "data": {
-                            "tts": true,
-                            "content": command.run(),
+                            "tts": false,
+                            "content": content,
                             "embeds": [],
                             "allowed_mentions": { "parse": [] }
                         }

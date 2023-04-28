@@ -9,6 +9,10 @@
             "name": "pong",
             "type": 1,
             "description": "ping"
+        },
+        {
+            "name": "run",
+            "type": 3
         }
     ]
 }
