@@ -29,59 +29,49 @@ impl Command {
         })
     }
 
-    pub async fn run(&self) -> String {
+    pub async fn run(&self) -> Result<String, String> {
         if let Some(content) = self.data.get_content() {
             match self.command_type {
-                CommandType::Ping => String::from("Pong!"),
-                CommandType::Pong => String::from("Ping!"),
-                CommandType::Run => run_code_command(&content)
-                    .await
-                    .unwrap_or(String::from("Error")),
+                CommandType::Ping => Ok(String::from("Pong!")),
+                CommandType::Pong => Ok(String::from("Ping!")),
+                CommandType::Run => run_code_command(&content).await,
             }
         } else {
-            String::from("ERROR: Couldn't get message content.")
+            Err(String::from("ERROR: This command can only be used through the context menu on a message containing a code block. Use the ... in the upper right corner of the message, Apps -> Run."))
         }
     }
 }
 
-async fn run_code_command(content: &str) -> Option<String> {
+async fn run_code_command(content: &str) -> Result<String, String> {
     let re = Regex::new(r"```(\w*)\n([\w\W]*)```").unwrap();
-    let mut reply = String::new();
 
-    for cap in re.captures_iter(content) {
-        let language = &cap[1];
-        let code = &cap[2];
+    let cap = re.captures_iter(content).next().unwrap();
+    let language = &cap[1];
+    let code = &cap[2];
 
-        let code_response = run_code(language, code).await;
+    let code_response = run_code(language, code).await?;
 
-        let validated_response = if let Some(response) = code_response.clone().ok() {
-            if response.matches('\n').count() < 25 {
-                format!("```\n{response}```\n")
-            } else {
-                String::from("ERROR: Output contained too many lines.")
-            }
-        } else {
-            code_response.err()?
-        };
-
-        reply.push_str(&validated_response);
-    }
-
-    if reply.len() < 2000 {
-        Some(reply)
+    let validated_response = if code_response.matches('\n').count() < 25 {
+        format!("```\n{code_response}```\n")
     } else {
-        Some(String::from("ERROR: Output contained too many characters."))
+        return Err(String::from("ERROR: Output contained too many lines."));
+    };
+
+    if validated_response.len() < 2000 {
+        Ok(validated_response)
+    } else {
+        Err(String::from("ERROR: Output contained too many characters."))
     }
 }
 
 async fn run_code(language: &str, code: &str) -> Result<String, String> {
     match language.to_lowercase().as_str() {
         "rust" => Ok(run_rust(code).await),
-        "c" | "go" | "cpp" | "java" | "cs" | "r" => Ok(run_other(language, code).await),
-        "js" | "javascript" => Ok(run_other("node", code).await),
-        "ts" | "typescript" => Ok(run_other("ts", code).await),
-        "py" | "python" => Ok(run_other("py", code).await),
-        "" => Err("ERROR: No language specified.\nHint: '```<language>'".into()),
+        "c" | "go" | "cpp" | "java" | "cs" | "r" => run_other(language, code).await,
+        "js" | "javascript" => run_other("node", code).await,
+        "ts" | "typescript" => run_other("ts", code).await,
+        "py" | "python" => run_other("py", code).await,
+        "" => Err("ERROR: No language specified.\nHint: ```<language>".into()),
         _ => Err("ERROR: Unsupported language.".into()),
     }
 }
@@ -99,7 +89,7 @@ struct OtherData {
     output: Option<String>,
 }
 
-async fn run_other(language: &str, code: &str) -> String {
+async fn run_other(language: &str, code: &str) -> Result<String, String> {
     let mut map = serde_json::Map::new();
     map.insert("code".into(), code.into());
     map.insert("codeId".into(), "".into());
@@ -119,15 +109,12 @@ async fn run_other(language: &str, code: &str) -> String {
 
     if let Some(success) = response.success {
         if success {
-            response
-                .data
-                .output
-                .unwrap_or(String::from("ERROR: API Error."))
+            Ok(response.data.output.unwrap())
         } else {
-            String::from("ERROR: Code failed.")
+            Err(String::from("ERROR: Code failed."))
         }
     } else {
-        String::from("ERROR: API Error.")
+        Err(String::from("ERROR: API Error."))
     }
 }
 
@@ -196,8 +183,8 @@ mod tests {
     async fn run_no_language() {
         let code = String::from("```\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
         assert_eq!(
-            String::from("ERROR: No language specified.\nHint: '```<language>'"),
-            run_code_command(&code).await.unwrap()
+            String::from("ERROR: No language specified.\nHint: ```<language>"),
+            run_code_command(&code).await.err().unwrap()
         );
     }
 
@@ -206,7 +193,7 @@ mod tests {
         let code = String::from("```random_lang\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
         assert_eq!(
             String::from("ERROR: Unsupported language."),
-            run_code_command(&code).await.unwrap()
+            run_code_command(&code).await.err().unwrap()
         );
     }
 }

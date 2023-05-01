@@ -47,7 +47,15 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
             let command = Command::new(data).unwrap();
             println!("Responding to {:?}!", command);
 
-            let content = command.run().await;
+            let result = command.run().await;
+
+            let flags = if result.is_ok() { 0 } else { 1 << 6 };
+
+            let content = if result.is_ok() {
+                result.ok().unwrap()
+            } else {
+                result.err().unwrap()
+            };
 
             Response::builder()
                 .status(200)
@@ -58,6 +66,7 @@ async fn handler(req: Request) -> Result<Response<Body>, Error> {
                         "data": {
                             "tts": false,
                             "content": content,
+                            "flags": flags,
                             "embeds": [],
                             "allowed_mentions": { "parse": [] }
                         }
