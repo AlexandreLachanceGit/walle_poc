@@ -77,6 +77,10 @@ async fn run_code_command(content: &str) -> Option<String> {
 async fn run_code(language: &str, code: &str) -> Result<String, String> {
     match language.to_lowercase().as_str() {
         "rust" => Ok(run_rust(code).await),
+        "c" | "go" | "cpp" | "java" | "cs" | "r" => Ok(run_other(language, code).await),
+        "js" | "javascript" => Ok(run_other("node", code).await),
+        "ts" | "typescript" => Ok(run_other("ts", code).await),
+        "py" | "python" => Ok(run_other("py", code).await),
         "" => Err("ERROR: No language specified.\nHint: '```<language>'".into()),
         _ => Err("ERROR: Unsupported language.".into()),
     }
@@ -84,7 +88,52 @@ async fn run_code(language: &str, code: &str) -> Result<String, String> {
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
-struct ApiResponse {
+struct OtherApiResponse {
+    success: Option<bool>,
+    data: OtherData,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+struct OtherData {
+    output: Option<String>,
+}
+
+async fn run_other(language: &str, code: &str) -> String {
+    let mut map = serde_json::Map::new();
+    map.insert("code".into(), code.into());
+    map.insert("codeId".into(), "".into());
+    map.insert("input".into(), "".into());
+    map.insert("language".into(), language.into());
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api2.sololearn.com/v2/codeplayground/v2/compile")
+        .json(&map)
+        .send()
+        .await
+        .unwrap()
+        .json::<OtherApiResponse>()
+        .await
+        .unwrap();
+
+    if let Some(success) = response.success {
+        if success {
+            response
+                .data
+                .output
+                .unwrap_or(String::from("ERROR: API Error."))
+        } else {
+            String::from("ERROR: Code failed.")
+        }
+    } else {
+        String::from("ERROR: API Error.")
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug)]
+struct RustApiResponse {
     success: Option<bool>,
     stdout: Option<String>,
     stderr: Option<String>,
@@ -108,7 +157,7 @@ async fn run_rust(code: &str) -> String {
         .send()
         .await
         .unwrap()
-        .json::<ApiResponse>()
+        .json::<RustApiResponse>()
         .await
         .unwrap();
 
@@ -128,6 +177,15 @@ mod tests {
     #[tokio::test]
     async fn run_valid_rust() {
         let code = String::from("```rust\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
+        assert_eq!(
+            String::from("```\nHello\n```\n"),
+            run_code_command(&code).await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn run_valid_python() {
+        let code = String::from("```py\nprint(\"Hello\")\n```\n");
         assert_eq!(
             String::from("```\nHello\n```\n"),
             run_code_command(&code).await.unwrap()
