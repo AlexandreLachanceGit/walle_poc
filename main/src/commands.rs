@@ -142,4 +142,13 @@ mod tests {
             run_code_command(&code).await.unwrap()
         );
     }
+
+    #[tokio::test]
+    async fn run_unsupported_language() {
+        let code = String::from("```random_lang\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
+        assert_eq!(
+            String::from("ERROR: Unsupported language."),
+            run_code_command(&code).await.unwrap()
+        );
+    }
 }
