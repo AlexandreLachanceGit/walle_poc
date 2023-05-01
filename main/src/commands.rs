@@ -1,3 +1,4 @@
+use regex::Regex;
 use serde::Deserialize;
 
 use crate::discord::InteractionData;
@@ -29,18 +30,56 @@ impl Command {
     }
 
     pub async fn run(&self) -> String {
-        match self.command_type {
-            CommandType::Ping => String::from("Pong!"),
-            CommandType::Pong => String::from("Ping!"),
-            CommandType::Run => run_code_command(&self.data)
-                .await
-                .unwrap_or(String::from("Error")),
+        if let Some(content) = self.data.get_content() {
+            match self.command_type {
+                CommandType::Ping => String::from("Pong!"),
+                CommandType::Pong => String::from("Ping!"),
+                CommandType::Run => run_code_command(&content)
+                    .await
+                    .unwrap_or(String::from("Error")),
+            }
+        } else {
+            String::from("ERROR: Couldn't get message content.")
         }
     }
 }
 
-async fn run_code_command(data: &InteractionData) -> Option<String> {
-    Some(run_code(&data.get_content()?).await)
+async fn run_code_command(content: &str) -> Option<String> {
+    let re = Regex::new(r"```(\w*)\n([\w\W]*)```").unwrap();
+    let mut reply = String::new();
+
+    for cap in re.captures_iter(content) {
+        let language = &cap[1];
+        let code = &cap[2];
+
+        let code_response = run_code(language, code).await;
+
+        let validated_response = if let Some(response) = code_response.clone().ok() {
+            if response.matches('\n').count() < 25 {
+                format!("```\n{response}```\n")
+            } else {
+                String::from("ERROR: Output contained too many lines.")
+            }
+        } else {
+            code_response.err()?
+        };
+
+        reply.push_str(&validated_response);
+    }
+
+    if reply.len() < 2000 {
+        Some(reply)
+    } else {
+        Some(String::from("ERROR: Output contained too many characters."))
+    }
+}
+
+async fn run_code(language: &str, code: &str) -> Result<String, String> {
+    match language.to_lowercase().as_str() {
+        "rust" => Ok(run_rust(code).await),
+        "" => Err("ERROR: No language specified.\nHint: '```<language>'".into()),
+        _ => Err("ERROR: Unsupported language.".into()),
+    }
 }
 
 #[allow(dead_code)]
@@ -52,7 +91,7 @@ struct ApiResponse {
     error: Option<String>,
 }
 
-async fn run_code(code: &str) -> String {
+async fn run_rust(code: &str) -> String {
     let mut map = serde_json::Map::new();
     map.insert("channel".into(), "stable".into());
     map.insert("mode".into(), "debug".into());
@@ -79,5 +118,28 @@ async fn run_code(code: &str) -> String {
         response.stdout.unwrap_or(String::from("stdout"))
     } else {
         response.stderr.unwrap_or(String::from("stderr"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_code_command;
+
+    #[tokio::test]
+    async fn run_valid_rust() {
+        let code = String::from("```rust\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
+        assert_eq!(
+            String::from("```\nHello\n```\n"),
+            run_code_command(&code).await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn run_no_language() {
+        let code = String::from("```\nfn main() {\nprintln!(\"Hello\");\n}\n```\n");
+        assert_eq!(
+            String::from("ERROR: No language specified.\nHint: '```<language>'"),
+            run_code_command(&code).await.unwrap()
+        );
     }
 }
